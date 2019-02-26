@@ -2,6 +2,8 @@ import scrapy
 import re
 from urllib.parse import quote
 from scrapy.selector.unified import Selector
+from scrapy.http import Response
+from html2text import html2text
 
 
 class IndeedSpider(scrapy.Spider):
@@ -17,41 +19,36 @@ class IndeedSpider(scrapy.Spider):
 
     def start_requests(self):
         for i in range(0, 6):
-            yield scrapy.Request(url=self.__url(i), callback=self.__parse)
+            yield scrapy.Request(url=self.__url(i), callback=self._parse)
 
-    @staticmethod
-    def _no_whitespaces(str):
-        return re.sub(r"\s", "", str)
+    def _parse(self, response: scrapy.http.Response):
+        for job_summary in response.css(".row"):
+            full_description_link = job_summary.css('h2 a::attr("href")').get()
+            yield response.follow(full_description_link, callback=self._parse_job_description)
 
-    def _parse_full_description(self, response: scrapy.http.Response, data: map):
-        description_section = response.css('.jobsearch-JobComponent-description')
-        description = description_section.css('::text').getall()
-        if not description:
-            description = description_section.css('div::text').getall()
-        data['description'] = ''.join(description)
-        if not data['company']:
-            data['company'] = response.css('.jobsearch-InlineCompanyRating div::text').get()
-        data['company'] = self._no_whitespaces(data['company'])
-        data['link'] = response.url
-        yield data
-
-    def _parse_summary(self, response: scrapy.http.Response, summary: Selector):
-        full_description_link = summary.css('h2 a::attr("href")').get()
-        partial_data = {
-            'title': summary.css('h2 a::attr("title")').get(),
-            'company': summary.css('.company a::text').get(),
-            'location': summary.css('.location::text').get()
+    def _parse_job_description(self, r: Response):
+        yield {
+            'title': self._get_job_title(r),
+            'company': self._get_company_name(r),
+            'location': self._get_location(r),
+            'description': self._get_description(r),
+            'link': r.url
         }
 
-        def callback(r):
-            return self._parse_full_description(r, partial_data)
+    @staticmethod
+    def _get_description(r: Response) -> str:
+        html_descriptions = r.css('.jobsearch-JobComponent-description').extract()
+        html_description = html2text(''.join(html_descriptions).strip())
+        return html_description
 
-        return response.follow(full_description_link, callback=callback)
+    @staticmethod
+    def _get_company_name(r: Response) -> str:
+        return r.css('.jobsearch-InlineCompanyRating div::text').get().strip()
 
-    def __parse(self, response: scrapy.http.Response):
-        for job_summary in response.css(".row"):
-            yield self._parse_summary(response, job_summary)
+    @staticmethod
+    def _get_location(r: Response) -> str:
+        return r.css('.jobsearch-InlineCompanyRating > div::text').getall()[-1]
 
-
-
-
+    @staticmethod
+    def _get_job_title(r: Response) -> str:
+        return r.css('h3::text').get()

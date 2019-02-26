@@ -1,7 +1,4 @@
 import scrapy
-import re
-from urllib.parse import quote
-from scrapy.selector.unified import Selector
 from scrapy.http import Response
 from typing import List
 from html2text import html2text
@@ -29,20 +26,20 @@ class PythonOrgSpider(scrapy.Spider):
         }
 
     @staticmethod
-    def _get_location(r: Response):
+    def _get_location(r: Response) -> str:
         return r.css('.listing-location a::text').get()
 
     @staticmethod
-    def _get_description(r: Response):
+    def _get_description(r: Response) -> str:
         html_description = ''.join(r.css('.job-description').extract()).strip()
         return html2text(html_description)
 
     @staticmethod
-    def _get_job_title(r: Response):
+    def _get_job_title(r: Response) -> str:
         return r.css('.company-name::text').get().strip()
 
     @staticmethod
-    def _get_company_name(r: Response):
+    def _get_company_name(r: Response) -> str:
         company_data_section = r.css('.company-name')
         if not company_data_section:
             return None
