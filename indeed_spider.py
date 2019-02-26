@@ -17,7 +17,7 @@ class IndeedSpider(scrapy.Spider):
 
     def start_requests(self):
         for i in range(0, 6):
-            yield scrapy.Request(url=self.__url(i), callback= self.__parse)
+            yield scrapy.Request(url=self.__url(i), callback=self.__parse)
 
     @staticmethod
     def _no_whitespaces(str):
